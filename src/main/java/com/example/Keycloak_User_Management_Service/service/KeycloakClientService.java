@@ -11,8 +11,12 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
+/**
+ * Service for managing users in Keycloak using its REST API.
+ * This service provides methods for fetching, creating, updating, and deleting users.
+ */
 @Service
-public class KeycloakClientService {
+public class KeycloakClientService implements KeycloakServiceInterfaces {
 
     private final RestTemplate restTemplate;
 
@@ -29,7 +33,13 @@ public class KeycloakClientService {
         this.restTemplate = restTemplate;
     }
 
-    // Get All Users
+    /**
+     * Fetches all users from Keycloak.
+     *
+     * @param accessToken The access token for authenticating with Keycloak.
+     * @return A ResponseEntity containing a JSON string with the list of users.
+     */
+    @Override
     public ResponseEntity<String> getAllUsers(String accessToken) {
         String url = keycloakBaseUrl + "/admin/realms/" + realm + "/users";
         HttpHeaders headers = new HttpHeaders();
@@ -39,7 +49,14 @@ public class KeycloakClientService {
         return restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
     }
 
-    // Create User
+    /**
+     * Creates a new user in Keycloak.
+     *
+     * @param accessToken The access token for authenticating with Keycloak.
+     * @param userPayload A map representing the user details.
+     * @return A ResponseEntity with a success message upon successful user creation.
+     */
+    @Override
     public ResponseEntity<String> createUser(String accessToken, Map<String, Object> userPayload) {
         String url = keycloakBaseUrl + "/admin/realms/" + realm + "/users";
         HttpHeaders headers = new HttpHeaders();
@@ -51,7 +68,15 @@ public class KeycloakClientService {
         return ResponseEntity.ok("User created successfully.");
     }
 
-    // Update User
+    /**
+     * Updates an existing user in Keycloak.
+     *
+     * @param accessToken The access token for authenticating with Keycloak.
+     * @param userId The ID of the user to be updated.
+     * @param userPayload A map containing the user details to be updated.
+     * @return A ResponseEntity with a success message upon successful user update.
+     */
+    @Override
     public ResponseEntity<String> updateUser(String accessToken, String userId, Map<String, Object> userPayload) {
         String url = keycloakBaseUrl + "/admin/realms/" + realm + "/users/" + userId;
         HttpHeaders headers = new HttpHeaders();
@@ -63,7 +88,14 @@ public class KeycloakClientService {
          return ResponseEntity.ok("User with ID " + userId + " updated successfully.");
     }
 
-    // Delete User
+    /**
+     * Deletes a user in Keycloak.
+     *
+     * @param accessToken The access token for authenticating with Keycloak.
+     * @param userId The ID of the user to be deleted.
+     * @return A ResponseEntity with a success message upon successful user deletion.
+     */
+    @Override
     public ResponseEntity<String> deleteUser(String accessToken, String userId) {
         String url = keycloakBaseUrl + "/admin/realms/" + realm + "/users/" + userId;
         HttpHeaders headers = new HttpHeaders();

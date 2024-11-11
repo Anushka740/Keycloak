@@ -43,4 +43,15 @@ public class KeycloakController {
             @PathVariable String userId) {
         return keycloakClientService.deleteUser(token.replace("Bearer ", ""), userId);
     }
+
+    // Usage example
+    public void fetchClientRoles(String accessToken, String clientUuid) {
+        ResponseEntity<String> response = keycloakClientService.getClientRoles(accessToken, clientUuid);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            System.out.println("Client roles: " + response.getBody());
+        } else {
+            System.out.println("Failed to fetch client roles: " + response.getStatusCode());
+        }
+    }
 }

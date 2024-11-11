@@ -16,4 +16,7 @@ public interface KeycloakServiceInterfaces {
 
     // Delete User
     ResponseEntity<String> deleteUser(String accessToken, String userId);
+
+
+    ResponseEntity<String> getClientRoles(String accessToken, String clientUuid);
 }

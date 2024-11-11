@@ -106,4 +106,27 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
 
         return ResponseEntity.ok("User with ID " + userId + " deleted successfully.");
     }
+
+    /**
+     * Retrieves the roles for a specific client in a Keycloak realm.
+     *
+     * @param accessToken The access token for authorization.
+     * @param clientUuid  The UUID of the client whose roles are to be retrieved.
+     * @return A ResponseEntity containing the response body with client roles or an error message.
+     */
+    @Override
+    public ResponseEntity<String> getClientRoles(String accessToken, String clientUuid) {
+        // Construct the URL to access client roles
+        String url = keycloakBaseUrl + "/admin/realms/" + realm + "/clients/" + clientUuid + "/roles";
+
+        // Set up the headers with the Bearer token
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        // Create an HTTP entity with headers only
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        // Make the GET request to fetch client roles
+        return restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+    }
 }

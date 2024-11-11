@@ -14,6 +14,8 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    public static final String ADMIN = "admin";
+    public static final String USER = "user";
     private final JwtConverter jwtConverter;
 
     public SecurityConfig(JwtConverter jwtConverter) {
@@ -24,10 +26,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests((authz) -> authz
                 .requestMatchers("/api/hello").permitAll()
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/user/**").hasRole("USER")
-                .requestMatchers("/api/admin-and-user/**").hasAnyRole("ADMIN", "USER")
-                .requestMatchers( "/keycloak/**").hasRole("ADMIN") // Allow only "ADMIN" to delete users
+                .requestMatchers("/api/admin/**").hasRole(ADMIN)
+                .requestMatchers("/api/user/**").hasRole(USER)
+                .requestMatchers("/api/admin-and-user/**").hasAnyRole(ADMIN, USER)
+                .requestMatchers( "/keycloak/**").hasRole(ADMIN) // Allow only "ADMIN" to delete users
                 .anyRequest().authenticated());
 
 

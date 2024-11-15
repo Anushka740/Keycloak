@@ -11,8 +11,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -44,14 +46,121 @@ public class KeycloakController {
         return keycloakClientService.deleteUser(token.replace("Bearer ", ""), userId);
     }
 
-    // Usage example
-    public void fetchClientRoles(String accessToken, String clientUuid) {
-        ResponseEntity<String> response = keycloakClientService.getClientRoles(accessToken, clientUuid);
+    @PostMapping("/clients/{clientUuid}/roles")
+    public ResponseEntity<String> createClientRole(
+            @RequestHeader("Authorization") String token,
+            @PathVariable String clientUuid,
+            @RequestBody Map<String, Object> userPayload) {
 
-        if (response.getStatusCode().is2xxSuccessful()) {
-            System.out.println("Client roles: " + response.getBody());
-        } else {
-            System.out.println("Failed to fetch client roles: " + response.getStatusCode());
-        }
+        // Add the client UUID to the payload if needed
+        userPayload.put("containerId", clientUuid);
+        return keycloakClientService.createClientRole(token.replace("Bearer ", ""), clientUuid, userPayload);
     }
+
+
+    @GetMapping("/clients/{clientUuid}/roles")
+    public ResponseEntity<String> getClientRoles(
+            @RequestHeader("Authorization") String accessToken,
+            @PathVariable("clientUuid") String clientUuid) {
+
+        // Remove "Bearer " prefix if present in the access token
+        if (accessToken.startsWith("Bearer ")) {
+            accessToken = accessToken.substring(7);
+        }
+
+        return keycloakClientService.getClientRoles(accessToken, clientUuid);
+    }
+
+    @PutMapping("/clients/{clientUuid}/{roleName}")
+    public ResponseEntity<String> updateClientRole(
+            @RequestHeader("Authorization") String token,
+            @PathVariable String clientUuid,
+            @PathVariable String roleName,
+            @RequestBody Map<String, Object> rolePayload) {
+        return keycloakClientService.updateClientRole(token.replace("Bearer ", ""), clientUuid, roleName, rolePayload);
+    }
+
+    @DeleteMapping("/clients/{clientUuid}/{roleName}")
+    public ResponseEntity<String> deleteClientRole(
+            @RequestHeader("Authorization") String token,
+            @PathVariable String clientUuid,
+            @PathVariable String roleName) {
+        return keycloakClientService.deleteClientRole(token.replace("Bearer ", ""), clientUuid, roleName);
+    }
+
+    @PostMapping("/realms/{realm}/roles")
+    public ResponseEntity<String> createRealmRole(@RequestHeader("Authorization") String token,
+                                                  @RequestBody Map<String, Object> rolePayload) {
+        return keycloakClientService.createRealmRole(token.replace("Bearer ", ""), rolePayload);
+    }
+
+    @GetMapping("/realms/{realm}/roles")
+    public ResponseEntity<String> getAllRealmRoles(@RequestHeader("Authorization") String token) {
+        return keycloakClientService.getAllRealmRoles(token.replace("Bearer ", ""));
+    }
+
+    @PutMapping("/realms/{realm}/roles/{roleName}")
+    public ResponseEntity<String> updateRealmRole(@RequestHeader("Authorization") String token,
+                                                  @PathVariable String roleName,
+                                                  @RequestBody Map<String, Object> rolePayload) {
+        return keycloakClientService.updateRealmRole(token.replace("Bearer ", ""), roleName, rolePayload);
+    }
+
+    @DeleteMapping("/realms/{realm}/roles/{roleName}")
+    public ResponseEntity<String> deleteRealmRole(@RequestHeader("Authorization") String token,
+                                                  @PathVariable String roleName) {
+        return keycloakClientService.deleteRealmRole(token.replace("Bearer ", ""), roleName);
+    }
+
+    @PostMapping("/users/{userId}/role-mappings/clients/{clientUuid}")
+    public ResponseEntity<String> assignClientRoleToUser(
+            @RequestHeader("Authorization") String token,
+            @PathVariable String userId,
+            @PathVariable String clientUuid,
+            @RequestBody List<Map<String, Object>> roles) {
+
+        return keycloakClientService.assignClientRoleToUser(
+                token.replace("Bearer ", ""),
+                userId,
+                clientUuid,
+                roles
+        );
+    }
+
+    @DeleteMapping("/users/{userId}/role-mappings/clients/{clientUuid}/roles/{roleName}")
+    public ResponseEntity<String> deleteUserClientRole(
+            @RequestHeader("Authorization") String token,
+            @PathVariable String userId,
+            @PathVariable String clientUuid,
+            @PathVariable String roleName) {
+
+        return keycloakClientService.deleteUserClientRole(
+                token.replace("Bearer ", ""),
+                userId,
+                clientUuid,
+                roleName
+        );
+    }
+
+    @PostMapping("/users/{userId}/role-mappings/realm")
+    public ResponseEntity<String> assignRealmRoles(
+            @RequestHeader("Authorization") String token,
+            @PathVariable String userId,
+            @RequestBody List<Map<String, Object>> roles) {
+
+        keycloakClientService.assignRealmRolesToUser(token.replace("Bearer ", ""), userId, roles);
+        return ResponseEntity.ok("Realm roles assigned successfully.");
+    }
+
+    @DeleteMapping("/{realm}/users/{userId}/role-mappings/realm/{roleName}")
+    public ResponseEntity<String> deleteAssignedRealmRole(
+            @RequestHeader("Authorization") String token,
+            @PathVariable String realm,
+            @PathVariable String userId,
+            @PathVariable String roleName) {
+
+        keycloakClientService.deleteAssignedRealmRoleFromUser(token.replace("Bearer ", ""), userId, roleName);
+        return ResponseEntity.ok("Assigned realm role deleted successfully.");
+    }
+
 }

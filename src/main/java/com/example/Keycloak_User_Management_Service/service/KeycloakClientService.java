@@ -1,20 +1,24 @@
 package com.example.Keycloak_User_Management_Service.service;
 
+import com.example.Keycloak_User_Management_Service.dao.UserImageRepository;
+import com.example.Keycloak_User_Management_Service.model.UserImage;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Service for managing users in Keycloak using its REST API.
@@ -36,6 +40,10 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
 
     @Value("${keycloak.clientUuid}")
     private String clientUuid;
+
+    @Autowired
+    private UserImageRepository userImageRepo;
+
 
     public KeycloakClientService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
@@ -390,6 +398,7 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
         restTemplate.exchange(url, HttpMethod.POST, request, String.class);
     }
 
+
     /**
      * Deletes a specific realm role assigned to a user in Keycloak by role name.
      *
@@ -427,5 +436,18 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
         restTemplate.exchange(url, HttpMethod.DELETE, request, String.class);
     }
 
+
+    public void saveUserImage(String userId, MultipartFile file) throws IOException, IOException {
+        Optional<UserImage> existingImage = userImageRepo.findByUserId(userId);
+        UserImage userImage = existingImage.orElse(new UserImage());
+        userImage.setUserId(userId);
+        userImage.setImage(file.getBytes());
+
+        userImageRepo.save(userImage);
+    }
+
+    public Optional<UserImage> getUserImage(String userId) {
+        return userImageRepo.findByUserId(userId);
+    }
 
 }

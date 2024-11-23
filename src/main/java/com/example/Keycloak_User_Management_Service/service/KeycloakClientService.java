@@ -1,21 +1,38 @@
 package com.example.Keycloak_User_Management_Service.service;
 
-import com.example.Keycloak_User_Management_Service.dao.UserImageRepository;
-import com.example.Keycloak_User_Management_Service.model.UserImage;
+import com.example.Keycloak_User_Management_Service.dao.StorageRepository;
+import com.example.Keycloak_User_Management_Service.entity.ImageData;
+import com.example.Keycloak_User_Management_Service.responses.UserDetailsResponse;
+import com.example.Keycloak_User_Management_Service.util.ImageUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +42,7 @@ import java.util.Optional;
  * This service provides methods for fetching, creating, updating, and deleting users.
  */
 @Service
+@Log4j2
 public class KeycloakClientService implements KeycloakServiceInterfaces {
 
     private final RestTemplate restTemplate;
@@ -42,8 +60,7 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
     private String clientUuid;
 
     @Autowired
-    private UserImageRepository userImageRepo;
-
+    private StorageRepository repository;
 
     public KeycloakClientService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
@@ -88,7 +105,7 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
      * Updates an existing user in Keycloak.
      *
      * @param accessToken The access token for authenticating with Keycloak.
-     * @param userId The ID of the user to be updated.
+     * @param userId      The ID of the user to be updated.
      * @param userPayload A map containing the user details to be updated.
      * @return A ResponseEntity with a success message upon successful user update.
      */
@@ -100,15 +117,15 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(userPayload, headers);
-         restTemplate.exchange(url, HttpMethod.PUT, request, String.class);
-         return ResponseEntity.ok("User with ID " + userId + " updated successfully.");
+        restTemplate.exchange(url, HttpMethod.PUT, request, String.class);
+        return ResponseEntity.ok("User with ID " + userId + " updated successfully.");
     }
 
     /**
      * Deletes a user in Keycloak.
      *
      * @param accessToken The access token for authenticating with Keycloak.
-     * @param userId The ID of the user to be deleted.
+     * @param userId      The ID of the user to be deleted.
      * @return A ResponseEntity with a success message upon successful user deletion.
      */
     @Override
@@ -127,7 +144,7 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
      * Retrieves roles for a given Keycloak client UUID.
      *
      * @param accessToken The access token with admin permissions
-     * @param clientUuid The UUID of the client
+     * @param clientUuid  The UUID of the client
      * @return ResponseEntity<String> with the list of client roles in JSON format
      */
     public ResponseEntity<String> getClientRoles(String accessToken, String clientUuid) {
@@ -161,7 +178,8 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
                 url,
                 HttpMethod.GET,
                 entity,
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {
+                }
         );
 
         for (Map<String, Object> role : response.getBody()) {
@@ -172,6 +190,7 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
 
         throw new RuntimeException("Role " + roleName + " not found for client " + clientUuid);
     }
+
     /**
      * Creates a client role in Keycloak for a specified client UUID.
      *
@@ -359,7 +378,8 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
 
         HttpEntity<Void> request = new HttpEntity<>(headers);
         ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(url, HttpMethod.GET, request,
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+                new ParameterizedTypeReference<List<Map<String, Object>>>() {
+                });
 
         // Find the role with the given name
         Map<String, Object> roleToRemove = response.getBody().stream()
@@ -408,7 +428,7 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
      */
     public void deleteAssignedRealmRoleFromUser(String accessToken, String userId, String roleName) {
         String rolesUrl = keycloakBaseUrl + "/admin/realms/" + realm + "/roles/" + roleName;
-        String url = keycloakBaseUrl + "/admin/realms/" + realm + "/users/" + userId + "/role-mappings/realm";
+        String url = keycloakBaseUrl + "/admin/realms/" + realm + "/users/" + userId;
 
         // Retrieve the role details (ID and Name) for the roleName
         HttpHeaders headers = new HttpHeaders();
@@ -419,7 +439,8 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
                 rolesUrl,
                 HttpMethod.GET,
                 new HttpEntity<>(headers),
-                new ParameterizedTypeReference<Map<String, Object>>() {}
+                new ParameterizedTypeReference<Map<String, Object>>() {
+                }
         );
 
         Map<String, Object> roleDetails = response.getBody();
@@ -437,17 +458,182 @@ public class KeycloakClientService implements KeycloakServiceInterfaces {
     }
 
 
-    public void saveUserImage(String userId, MultipartFile file) throws IOException, IOException {
-        Optional<UserImage> existingImage = userImageRepo.findByUserId(userId);
-        UserImage userImage = existingImage.orElse(new UserImage());
-        userImage.setUserId(userId);
-        userImage.setImage(file.getBytes());
+    public String uploadImage(MultipartFile file, String userId) throws IOException {
+        // Check if an image already exists for the userId
+        Optional<ImageData> existingImage = repository.findById(userId);
+        if (existingImage.isPresent()) {
+            throw new IllegalArgumentException("Image already exists for this user.");
+        }
 
-        userImageRepo.save(userImage);
+        // Save the new image
+        ImageData imageData = repository.save(
+                ImageData.builder()
+                        .id(userId) // Use userId as the primary key
+                        .name(file.getOriginalFilename())
+                        .type(file.getContentType())
+                        .imageData(ImageUtils.compressImage(file.getBytes()))
+                        .build()
+        );
+
+        if (imageData != null) {
+            return "Image uploaded successfully for userId: " + userId;
+        }
+        return null;
     }
 
-    public Optional<UserImage> getUserImage(String userId) {
-        return userImageRepo.findByUserId(userId);
+
+//    @Transactional
+//    public byte[] downloadImage(String fileName) {
+//        Optional<ImageData> dbImageData = repository.findByName(fileName); // Assuming the method is findByName
+//        if (!dbImageData.isPresent()) {
+//            throw new EntityNotFoundException("Image not found with name: " + fileName);
+//        }
+//        // Decompress the image
+//        byte[] originalImageData = ImageUtils.decompressImage(dbImageData.get().getImageData());
+//
+//        // Resize the image to passport size
+//        return resizeImage(originalImageData, 150, 150); // Resize to 150x150 pixels (or any preferred size)
+//    }
+
+
+
+    @Transactional
+    public ResponseEntity<byte[]> downloadImage(String fileName) {
+        try {
+            // Fetch image data from the database
+            Optional<ImageData> dbImageData = repository.findByName(fileName);
+            if (!dbImageData.isPresent()) {
+                throw new EntityNotFoundException("Image not found with name: " + fileName);
+            }
+
+            // Decompress the image if it's stored in compressed form
+            byte[] originalImageData = ImageUtils.decompressImage(dbImageData.get().getImageData());
+
+            // Resize the image to passport size (150x150 pixels, or any preferred size)
+            byte[] resizedImageData = resizeImage(originalImageData, 150, 150);
+
+            // Identify the file type dynamically based on the image byte data (e.g., PNG, JPEG, etc.)
+            String fileType = getImageFileType(resizedImageData);
+
+            // Set the appropriate MediaType for the image (PNG, JPEG, etc.)
+            MediaType mediaType = MediaType.IMAGE_PNG; // Default to PNG
+            if ("image/jpeg".equals(fileType)) {
+                mediaType = MediaType.IMAGE_JPEG;
+            } else if ("image/gif".equals(fileType)) {
+                mediaType = MediaType.IMAGE_GIF;
+            }
+
+            // Return the image as a ResponseEntity with the appropriate media type
+            return ResponseEntity
+                    .status(HttpStatus.OK)
+                    .contentType(mediaType)
+                    .body(resizedImageData);
+
+        } catch (EntityNotFoundException e) {
+            // Log the exception and rethrow
+            log.error("Image not found for file: {}", fileName, e);
+            throw e;
+        } catch (Exception e) {
+            // Log the general exception and rethrow
+            log.error("Error processing image: {}", fileName, e);
+            throw new RuntimeException("Error retrieving the image", e);
+        }
     }
+
+    // Helper method to determine the image file type (PNG, JPEG, etc.)
+    private String getImageFileType(byte[] imageData) {
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(imageData)) {
+            // Read the first few bytes of the image to determine the file type
+            BufferedImage bufferedImage = ImageIO.read(bais);
+            if (bufferedImage == null) {
+                throw new IOException("Could not determine image type.");
+            }
+
+            // Determine image type based on the format
+            ImageReader reader = ImageIO.getImageReadersByFormatName("png").next();
+            String fileType = "image/png"; // Default to PNG
+
+            if (reader.canReadRaster()) {
+                fileType = "image/png"; // PNG
+            }
+
+            return fileType;
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error detecting image type", e);
+        }
+    }
+
+
+    public ResponseEntity<Map<String, Object>> getUserDetailsById(String accessToken, String userId) {
+        String url = keycloakBaseUrl + "/admin/realms/" + realm + "/users/" + userId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<Map<String, Object>> userResponse = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                entity,
+                new ParameterizedTypeReference<Map<String, Object>>() {}
+        );
+
+        if (userResponse.getBody() == null) {
+            throw new EntityNotFoundException("User not found in Keycloak with ID: " + userId);
+        }
+
+        // Fetch the image file name from DB
+        String imageFileName = getImageFileNameFromDb(userId);
+
+        ResponseEntity<byte[]> passportImage = null;
+        try {
+            passportImage = downloadImage(imageFileName);
+        } catch (EntityNotFoundException e) {
+            e.getMessage();
+        }
+
+        // Combine user details and image into a response map
+        Map<String, Object> userWithImage = userResponse.getBody();
+        if (passportImage != null) {
+            userWithImage.put("image", passportImage.getBody());
+        }
+        return ResponseEntity.ok(userWithImage);
+    }
+
+
+
+    public String getImageFileNameFromDb(String userId) {
+        Optional<ImageData> dbImageData = repository.findById(userId);
+
+        if (!dbImageData.isPresent()) {
+            throw new EntityNotFoundException("No image found for user with ID: " + userId);
+        }
+
+        // Return the image file name stored in the database
+        return dbImageData.get().getName(); // Assuming ImageData has a getFileName() method
+    }
+
+
+    private byte[] resizeImage(byte[] originalImageData, int width, int height) {
+        try {
+            // Convert byte[] to BufferedImage
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(originalImageData);
+            BufferedImage originalImage = ImageIO.read(inputStream);
+
+            // Resize the image
+            BufferedImage resizedImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = resizedImage.createGraphics();
+            g.drawImage(originalImage, 0, 0, width, height, null);
+            g.dispose();
+
+            // Convert BufferedImage back to byte[]
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ImageIO.write(resizedImage, "png", outputStream); // Adjust format as needed (e.g., png, jpg)
+            return outputStream.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Error resizing image", e);
+        }
+    }
+
 
 }

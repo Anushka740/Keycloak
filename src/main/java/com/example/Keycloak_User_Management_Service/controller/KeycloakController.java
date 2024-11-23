@@ -1,7 +1,10 @@
 package com.example.Keycloak_User_Management_Service.controller;
 
 import com.example.Keycloak_User_Management_Service.service.KeycloakClientService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
 
 import java.io.IOException;
 import java.util.List;
@@ -165,16 +169,73 @@ public class KeycloakController {
         return ResponseEntity.ok("Assigned realm role deleted successfully.");
     }
 
+//    @PostMapping("/upload")
+//    public ResponseEntity<?> uploadImage(@RequestParam("image")MultipartFile file) throws IOException {
+//        String uploadImage = keycloakClientService.uploadImage(file);
+//        return ResponseEntity.status(HttpStatus.OK)
+//                .body(uploadImage);
+//    }
+
     @PostMapping("/upload/{userId}")
-    public ResponseEntity<String> uploadUserImage(
-            @PathVariable String userId,
-            @RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadImage(
+            @RequestParam("image") MultipartFile file,
+            @PathVariable String userId) throws IOException {
+        String response = keycloakClientService.uploadImage(file, userId);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+
+//    @GetMapping("/{fileName}")
+//    public ResponseEntity<?> downloadImage(@PathVariable String fileName) {
+//        try {
+//            byte[] imageData = keycloakClientService.downloadImage(fileName);
+//            return ResponseEntity.status(HttpStatus.OK)
+//                    .contentType(MediaType.IMAGE_PNG) // Assuming PNG. Use dynamic type if needed.
+//                    .body(imageData);
+//        } catch (EntityNotFoundException e) {
+//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error retrieving the image.");
+//        }
+//    }
+
+    @GetMapping("/{fileName}")
+    public ResponseEntity<?> downloadImage(@PathVariable String fileName) {
         try {
-            keycloakClientService.saveUserImage(userId, file);
-            return ResponseEntity.ok("Image uploaded successfully for user: " + userId);
-        } catch (IOException e) {
-            return ResponseEntity.status(500).body("Failed to upload image: " + e.getMessage());
+            // Fetch the image from the service
+            ResponseEntity<byte[]> response = keycloakClientService.downloadImage(fileName);
+
+            // Return the response directly from the service
+
+            return ResponseEntity.status(response.getStatusCode())
+                    .contentType(response.getHeaders().getContentType())
+                    .body(response.getBody());
+
+        } catch (EntityNotFoundException e) {
+            // Handle the case where the image is not found in the database
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Image not found: " + fileName);
+        } catch (Exception e) {
+            // Handle any other internal errors
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error retrieving the image.");
         }
     }
+
+
+
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<Map<String, Object>> getUserDetails(@RequestHeader("Authorization") String token,
+                                                              @PathVariable String userId) {
+        // Call the service to fetch both user details and image
+        return keycloakClientService.getUserDetailsById(token.replace("Bearer ", ""), userId);
+
+    }
+
+
+
+
+
+
 
 }

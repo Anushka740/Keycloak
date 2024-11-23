@@ -1,5 +1,6 @@
 package com.example.Keycloak_User_Management_Service.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
@@ -37,4 +38,6 @@ public interface KeycloakServiceInterfaces {
     ResponseEntity<String> updateClientRole(String accessToken, String clientUuid, String roleName, Map<String, Object> rolePayload);
 
     ResponseEntity<String> deleteClientRole(String accessToken, String clientUuid, String roleName);
+
+//    ResponseEntity<?> getUserDetailsWithImage(String userId, String accessToken) throws JsonProcessingException;
 }
